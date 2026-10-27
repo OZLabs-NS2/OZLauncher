@@ -1,0 +1,21 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x=1) in;
+#include "abi.glsl"
+#include "hb.glsl"
+void main(){
+ uint pressed=hbPressed();
+ c.motion.x+=1.0/60.0;c.state.z++;
+ c.transition.x=max(0.0,c.transition.x-1.0/15.0);
+ if(hbConnected() && (pressed&(HB_B|HB_MINUS))!=0u)hbExit();
+ for(uint i=0u;i<HB_EVENT_CAPACITY;i++){
+  uint type,data,status,sequence;
+  if(!hbEventPoll(type,data,status,sequence))break;
+  c.game=uvec4(type,data,status,sequence);
+  if(c.piece.x<99999)c.piece.x++;
+ }
+ hbEndFrame();
+ c.piece.y=hbEventAvailable()?1:0;
+ c.piece.z=int(hbEventDropped());
+ c.piece.w=int(hbEventErrors());
+}

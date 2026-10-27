@@ -2,7 +2,8 @@
 
 Build GPU apps for HBLauncher running through SmileBASIC. The launcher is the
 SDK's integration example: normal navigation uses its input helpers, and the
-cursor uses native Joy-Con 2 optical samples. Hello World is the minimal app.
+cursor uses native Joy-Con 2 optical samples. Hello World is the minimal app;
+[Event System](../apps/event-system/README.md) demonstrates the event queue.
 Hardware probes live under `tools/`; the launcher has no diagnostics menu.
 
 This SDK targets the repository's qualified **SmileBASIC 4.4.9 / Switch 2
@@ -115,6 +116,7 @@ request means the API accepted it; it does not prove physical actuation.
 | `host/hardware.cjs` | Device discovery, native frame calls, motion ownership and pulses |
 | `host/runtime.cjs` | App capability validation and serialized mailbox dispatch |
 | `host/storage.cjs` | Per-app persistent key-value storage with atomic writes and quotas |
+| `tests/event-system.test.cjs` | GPU-executed event queue and mailbox notification tests |
 | `host/joy-mouse.cjs` | Direct Jcms service lifecycle and optical sample decoder |
 | `host/haptics.cjs` | Native-timed amplitude/frequency envelopes and stop cleanup |
 | `native/finite.cjs` | Bounded native jobs with console-side completion |

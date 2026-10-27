@@ -30,6 +30,7 @@ test('motion decoder preserves u64 sample identity and signed float components',
 });
 test('mailbox dispatch acknowledges once, rejects undeclared capabilities and resets on app switch',async()=>{
  const L=require('../host/layout.cjs'),memory=Buffer.alloc(L.SIZE),mapped=0x400000;
+ assert.equal(L.EVENT.offset,L.FIELD.response+1056);assert.equal(L.EVENT.offset+L.EVENT.size,L.SIZE);
  let pulses=0,closed=false;
  const rpc={async read(address,n){return Buffer.from(memory.subarray(address-mapped-L.OFFSET,address-mapped-L.OFFSET+n));},async write(address,b){b.copy(memory,address-mapped-L.OFFSET);}};
  const hardware={async poll(){return Buffer.alloc(1024);},async pulse(){pulses++;return {actual:Buffer.alloc(16)};},async close(){closed=true;}};
@@ -37,7 +38,9 @@ test('mailbox dispatch acknowledges once, rejects undeclared capabilities and re
  await runtime.atBoundary();memory.writeUInt32LE(1,L.FIELD.request);memory.writeUInt32LE(1,L.FIELD.request+4);
  await runtime.atBoundary();await runtime.atBoundary();assert.equal(pulses,1);assert.equal(memory.readUInt32LE(L.FIELD.response),1);
  const app={fingerprint:'test',manifest:{}};await runtime.atBoundary(app);assert.equal(memory.readUInt32LE(L.FIELD.request),0);
- memory.writeUInt32LE(1,L.FIELD.request);memory.writeUInt32LE(1,L.FIELD.request+4);await runtime.atBoundary(app);
+ memory.writeUInt32LE(0xdeadbeef,L.EVENT.offset);const nextApp={fingerprint:'other',manifest:{}};
+ await runtime.atBoundary(nextApp);assert.equal(memory.readUInt32LE(L.EVENT.offset),0);
+ memory.writeUInt32LE(1,L.FIELD.request);memory.writeUInt32LE(1,L.FIELD.request+4);await runtime.atBoundary(nextApp);
  assert.equal(memory.readUInt32LE(L.FIELD.response+4),L.STATUS.unsupported);assert.equal(pulses,1);await runtime.close();assert.equal(closed,true);
 });
 test('storage mailbox transports values, reports missing keys and enforces capability',async t=>{

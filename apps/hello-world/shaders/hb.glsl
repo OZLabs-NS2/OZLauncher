@@ -4,6 +4,9 @@
 const uint HB_A=1u,HB_B=2u,HB_X=4u,HB_Y=8u,HB_L=64u,HB_R=128u,HB_PLUS=1024u,HB_MINUS=2048u;
 const uint HB_LEFT=4096u,HB_UP=8192u,HB_RIGHT=16384u,HB_DOWN=32768u;
 const uint HB_PAD=1u,HB_MOTION=2u,HB_KEYBOARD=4u,HB_MOUSE=8u,HB_NETWORK=16u,HB_JOY_MOUSE=32u,HB_PAD_SOURCES=64u;
+const uint HB_EVENT_BUTTON_PRESSED=1u,HB_EVENT_BUTTON_RELEASED=2u;
+const uint HB_EVENT_SERVICE_COMPLETED=3u,HB_EVENT_SERVICE_FAILED=4u;
+const uint HB_EVENT_CAPACITY=64u;
 const uint HB_EXT=(0x7f0000u-1024u)/4u;
 uint hbWord(uint offset){return c.atlas[HB_EXT+offset/4u];}
 float hbFloat(uint offset){return uintBitsToFloat(hbWord(offset));}
@@ -65,16 +68,88 @@ uint hbFtpReceived(){return hbWord(8224u);}
 uint hbFtpFiles(){return hbWord(8232u);}
 bool hbFtpBusy(){return hbWord(8448u)!=hbWord(8236u);}
 #ifndef HB_READONLY
+const uint HB_EVENT_BASE=5152u,HB_EVENT_MAGIC=0x48424556u,HB_EVENT_VERSION=1u;
+const uint HB_EVENT_HEADER_WORDS=10u,HB_EVENT_WORDS=4u;
+uint hbEventWord(uint offset){return c.atlas[HB_EXT+(HB_EVENT_BASE+offset)/4u];}
+void hbEventSetWord(uint offset,uint value){c.atlas[HB_EXT+(HB_EVENT_BASE+offset)/4u]=value;}
+uint hbEventIncrement(uint value){return value==0xffffffffu?value:value+1u;}
+void hbEventReset(uint errors){
+ for(uint i=0u;i<HB_EVENT_HEADER_WORDS+HB_EVENT_CAPACITY*HB_EVENT_WORDS;i++)hbEventSetWord(i*4u,0u);
+ hbEventSetWord(0u,HB_EVENT_MAGIC);hbEventSetWord(4u,HB_EVENT_VERSION);hbEventSetWord(24u,errors);
+}
+void hbEventEnsure(){
+ uint magic=hbEventWord(0u),version=hbEventWord(4u);
+ if(magic!=HB_EVENT_MAGIC||version!=HB_EVENT_VERSION){
+  bool pristine=true;
+  for(uint i=0u;i<HB_EVENT_HEADER_WORDS+HB_EVENT_CAPACITY*HB_EVENT_WORDS;i++)
+   if(hbEventWord(i*4u)!=0u)pristine=false;
+  hbEventReset(pristine?0u:1u);return;
+ }
+ uint readIndex=hbEventWord(8u),writeIndex=hbEventWord(12u),count=hbEventWord(16u);
+ if(readIndex>=HB_EVENT_CAPACITY||writeIndex>=HB_EVENT_CAPACITY||count>HB_EVENT_CAPACITY||
+    (readIndex+count)%HB_EVENT_CAPACITY!=writeIndex){
+  hbEventReset(hbEventIncrement(hbEventWord(24u)));
+ }
+}
+void hbEventDiscard(){
+ uint readIndex=hbEventWord(8u);
+ hbEventSetWord(8u,(readIndex+1u)%HB_EVENT_CAPACITY);
+ hbEventSetWord(16u,hbEventWord(16u)-1u);
+}
+void hbEventPush(uint type,uint data,uint status){
+ if(type<HB_EVENT_BUTTON_PRESSED||type>HB_EVENT_SERVICE_FAILED)return;
+ uint count=hbEventWord(16u);
+ if(count>=HB_EVENT_CAPACITY){hbEventSetWord(20u,hbEventIncrement(hbEventWord(20u)));return;}
+ uint writeIndex=hbEventWord(12u),offset=(HB_EVENT_HEADER_WORDS+writeIndex*HB_EVENT_WORDS)*4u;
+ uint sequence=hbEventWord(32u)+1u;if(sequence==0u)sequence=1u;
+ hbEventSetWord(offset,type);hbEventSetWord(offset+4u,data);hbEventSetWord(offset+8u,status);hbEventSetWord(offset+12u,sequence);
+ hbEventSetWord(12u,(writeIndex+1u)%HB_EVENT_CAPACITY);hbEventSetWord(16u,count+1u);hbEventSetWord(32u,sequence);
+}
+bool hbEventAvailable(){hbEventEnsure();return hbEventWord(16u)!=0u;}
+bool hbEventPoll(out uint type,out uint data,out uint status,out uint sequence){
+ type=0u;data=0u;status=0u;sequence=0u;hbEventEnsure();
+ if(hbEventWord(16u)==0u)return false;
+ uint readIndex=hbEventWord(8u),offset=(HB_EVENT_HEADER_WORDS+readIndex*HB_EVENT_WORDS)*4u;
+ uint nextType=hbEventWord(offset),nextData=hbEventWord(offset+4u),nextStatus=hbEventWord(offset+8u),nextSequence=hbEventWord(offset+12u);
+ bool buttonEvent=nextType==HB_EVENT_BUTTON_PRESSED||nextType==HB_EVENT_BUTTON_RELEASED;
+ bool serviceEvent=nextType==HB_EVENT_SERVICE_COMPLETED||nextType==HB_EVENT_SERVICE_FAILED;
+ if((!buttonEvent&&!serviceEvent)||nextSequence==0u||
+    (buttonEvent&&(nextData==0u||nextStatus!=0u))||(serviceEvent&&(nextData<1u||nextData>5u))){
+  hbEventSetWord(24u,hbEventIncrement(hbEventWord(24u)));hbEventDiscard();return false;
+ }
+ type=nextType;data=nextData;status=nextStatus;sequence=nextSequence;hbEventDiscard();return true;
+}
+uint hbEventDropped(){hbEventEnsure();return hbEventWord(20u);}
+bool hbEventOverflowed(){return hbEventDropped()!=0u;}
+uint hbEventErrors(){hbEventEnsure();return hbEventWord(24u);}
+void hbEventServiceResponse(){
+ hbEventEnsure();
+ uint requestSequence=hbWord(2048u),responseSequence=hbWord(4096u);
+ if(requestSequence!=0u&&requestSequence==responseSequence&&requestSequence!=hbEventWord(28u)){
+  uint operation=hbWord(2052u),result=hbWord(4100u);
+  hbEventSetWord(28u,requestSequence);
+  if(operation>=1u&&operation<=5u)
+   hbEventPush(result==0u?HB_EVENT_SERVICE_COMPLETED:HB_EVENT_SERVICE_FAILED,operation,result);
+ }
+}
 bool hbFtpCommand(uint action){
  if(!hbFtpAvailable()||hbFtpBusy()||(action!=1u&&action!=2u))return false;
  uint o=HB_EXT+8448u/4u;c.atlas[o+1u]=action;
  uint sequence=c.atlas[o]+1u;c.atlas[o]=sequence==0u?1u:sequence;return true;
 }
-void hbEndFrame(){c.state.y=hbButtons();}
+void hbEndFrame(){
+ hbEventEnsure();
+ uint buttons=hbButtons(),previous=c.state.y,pressed=buttons&~previous,released=previous&~buttons;
+ if(pressed!=0u)hbEventPush(HB_EVENT_BUTTON_PRESSED,pressed,0u);
+ if(released!=0u)hbEventPush(HB_EVENT_BUTTON_RELEASED,released,0u);
+ hbEventServiceResponse();
+ c.state.y=buttons;
+}
 void hbExit(){c.reserved.z=1u;}
 void hbSound(uint id){c.events.x++;c.events.y=id;}
 bool hbRequest(uint op,uint a,uint b,uint d){
  if(!hbAvailable()||hbBusy())return false;
+ hbEventServiceResponse();
  uint o=HB_EXT+2048u/4u;c.atlas[o+1u]=op;c.atlas[o+2u]=a;c.atlas[o+3u]=b;c.atlas[o+4u]=d;
  uint sequence=c.atlas[o]+1u;c.atlas[o]=sequence==0u?1u:sequence;return true;
 }

@@ -1,0 +1,21 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x=1) in;
+#include "state.glsl"
+#include "hb.glsl"
+void main(){
+ if(c.raw[0].w!=1u){
+  uint type,data,status,sequence;
+  if(hbEventPoll(type,data,status,sequence)){
+   if(c.piece.w==0)c.stats=uvec4(type,data,status,sequence);
+   c.game=uvec4(type,data,status,sequence);
+   c.piece.w++;
+  }
+ }
+ if(c.raw[0].w==2u)hbRequest(3u,0u,1u,0u);
+ hbEndFrame();
+ c.piece.x=hbEventAvailable()?1:0;
+ c.piece.y=int(hbEventDropped());
+ c.piece.z=int(hbEventErrors());
+ c.bag[0]=hbEventOverflowed()?1u:0u;
+}
