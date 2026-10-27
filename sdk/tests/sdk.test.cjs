@@ -5,6 +5,7 @@ const {create}=require('../native/client.cjs');
 test('manifest validates explicit capabilities and bounded IPv4 endpoints',()=>{
  assert.deepEqual(validateManifest(),{capabilities:[],endpoints:[]});
  assert.deepEqual(validateManifest({version:1,capabilities:['udp','udp'],endpoints:[{address:'127.0.0.1',port:9000}]}).capabilities,['udp']);
+ assert.deepEqual(validateManifest({version:1,capabilities:['storage']}).capabilities,['storage']);
  for(const value of [{version:2,capabilities:[]},{version:1,capabilities:['native']},{version:1,capabilities:['udp'],endpoints:[{address:'example.com',port:80}]},{version:1,capabilities:[],endpoints:[{address:'127.0.0.1',port:65536}]}])assert.throws(()=>validateManifest(value));
 });
 test('native client verifies code before allocating and enforces exact buffer bounds',async()=>{
@@ -38,6 +39,28 @@ test('mailbox dispatch acknowledges once, rejects undeclared capabilities and re
  const app={fingerprint:'test',manifest:{}};await runtime.atBoundary(app);assert.equal(memory.readUInt32LE(L.FIELD.request),0);
  memory.writeUInt32LE(1,L.FIELD.request);memory.writeUInt32LE(1,L.FIELD.request+4);await runtime.atBoundary(app);
  assert.equal(memory.readUInt32LE(L.FIELD.response+4),L.STATUS.unsupported);assert.equal(pulses,1);await runtime.close();assert.equal(closed,true);
+});
+test('storage mailbox transports values, reports missing keys and enforces capability',async t=>{
+ const fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path'),L=require('../host/layout.cjs'),memory=Buffer.alloc(L.SIZE),mapped=0x500000;
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'oz-mailbox-storage-'));t.after(()=>fs.rm(root,{recursive:true,force:true}));
+ const rpc={async read(address,n){return Buffer.from(memory.subarray(address-mapped-L.OFFSET,address-mapped-L.OFFSET+n));},async write(address,b){b.copy(memory,address-mapped-L.OFFSET);}};
+ const hardware={async poll(){return Buffer.alloc(1024);},async close(){}};
+ const runtime=await require('../host/runtime.cjs').create({rpc,mapped,storageRoot:root,hardware});
+ const app={id:'mailbox-app',fingerprint:'mailbox-app',manifest:{sdk:{version:1,capabilities:['storage']}}};await runtime.atBoundary(app);
+ const request=(sequence,action,key,value=Buffer.alloc(0))=>{
+  const offset=L.FIELD.request;memory.writeUInt32LE(sequence,offset);memory.writeUInt32LE(L.OP.storage,offset+4);memory.writeUInt32LE(action,offset+8);memory.writeUInt32LE(key.length,offset+12);memory.writeUInt32LE(value.length,offset+16);key.copy(memory,offset+32);value.copy(memory,offset+32+key.length);
+ };
+ const response=()=>memory.subarray(L.FIELD.response,L.FIELD.response+1056);
+ request(1,1,Buffer.from('data'),Buffer.from([0,5,255]));await runtime.atBoundary(app);assert.equal(response().readUInt32LE(4),L.STATUS.ok);
+ request(2,2,Buffer.from('data'));await runtime.atBoundary(app);assert.equal(response().readUInt32LE(4),L.STATUS.ok);assert.deepEqual(response().subarray(32,35),Buffer.from([0,5,255]));
+ request(3,4,Buffer.from('data'));await runtime.atBoundary(app);assert.equal(response().readUInt32LE(4),L.STATUS.ok);assert.deepEqual(response().subarray(32,33),Buffer.from([1]));
+ request(4,3,Buffer.from('data'));await runtime.atBoundary(app);assert.equal(response().readUInt32LE(4),L.STATUS.ok);assert.deepEqual(response().subarray(32,33),Buffer.from([1]));
+ request(5,4,Buffer.from('data'));await runtime.atBoundary(app);assert.equal(response().readUInt32LE(4),L.STATUS.ok);assert.deepEqual(response().subarray(32,33),Buffer.from([0]));
+ request(6,3,Buffer.from('data'));await runtime.atBoundary(app);assert.equal(response().readUInt32LE(4),L.STATUS.ok);assert.deepEqual(response().subarray(32,33),Buffer.from([0]));
+ request(7,2,Buffer.from('absent'));await runtime.atBoundary(app);assert.equal(response().readUInt32LE(4),L.STATUS.missing);
+ request(8,2,Buffer.from('../escape'));await runtime.atBoundary(app);assert.equal(response().readUInt32LE(4),L.STATUS.invalid);
+ const denied={id:'denied-app',fingerprint:'denied-app',manifest:{sdk:{version:1,capabilities:[]}}};await runtime.atBoundary(denied);request(1,1,Buffer.from('data'),Buffer.from('no'));await runtime.atBoundary(denied);assert.equal(response().readUInt32LE(4),L.STATUS.unsupported);
+ await runtime.close();
 });
 test('checked-in native signatures cover optical worker dependencies',()=>{
  const d=require('../native/ipc-functions.json');for(const key of ['send','aruid','transfer','copy'])assert.ok(d[key]&&d[key].hex.length>=8);assert.equal(d.copy.offset,0x586fb0);

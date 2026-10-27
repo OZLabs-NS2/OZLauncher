@@ -301,8 +301,9 @@ byte layout is the public contract.
 | 1024 onward | `atlas[]` | App data as 32-bit words; use your own packing convention |
 
 The host clears the full shared buffer when loading an app, copies initial state
-and data, and clears launch/exit requests.
-App state is transient: there is no persistence/save API.
+and data, and clears launch/exit requests. This GPU buffer is transient; apps
+that need durable state can use the SDK's opt-in [persistent storage
+capability](sdk/docs/services.md#persistent-key-value-storage-operation-5).
 
 ### Compute and exit
 

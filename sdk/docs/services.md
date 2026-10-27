@@ -53,12 +53,12 @@ request services, add:
 ```json
 "sdk": {
   "version": 1,
-  "capabilities": ["vibration", "nfc", "udp"],
+  "capabilities": ["vibration", "nfc", "udp", "storage"],
   "endpoints": [{"address": "192.168.1.10", "port": 9000}]
 }
 ```
 
-Supported capabilities are exactly `vibration`, `nfc` and `udp`. Endpoint
+Supported capabilities are exactly `vibration`, `nfc`, `udp` and `storage`. Endpoint
 addresses must be IPv4 literals with ports 1–65535; at most eight endpoints are
 allowed. DNS names are not accepted. `validateManifest()` is called by the
 catalog before a package is admitted. The host rejects undeclared requests.
@@ -71,7 +71,7 @@ Request at extension offset 2048:
 | Relative offset | u32 field |
 | --- | --- |
 | 0 | Nonzero sequence, incremented for each request |
-| 4 | Operation: 1 vibration, 2 NFC, 3 UDP, 4 haptic envelope |
+| 4 | Operation: 1 vibration, 2 NFC, 3 UDP, 4 haptic envelope, 5 persistent storage |
 | 8 | Argument A |
 | 12 | Argument B |
 | 16 | Argument C |
@@ -88,11 +88,12 @@ Response at extension offset 4096:
 | 12–31 | Reserved |
 | 32–1055 | Response payload |
 
-Status 0 is success, 1 unsupported or undeclared operation, 2 invalid UDP
-endpoint/length, 3 native/adapter error, 4 timeout. On caught errors the payload
-is a bounded UTF-8 error message. Native Result values are preserved in those
-messages where available. Invalid vibration parameters currently return adapter
-error 3. A request is consumed once even on failure; use a new sequence to retry.
+Status 0 is success, 1 unsupported or undeclared operation, 2 invalid request,
+3 native/adapter error, 4 timeout, 5 missing storage key, and 6 storage I/O or
+quota error. On caught errors the payload is a bounded UTF-8 error message.
+Native Result values are preserved in those messages where available. Invalid
+vibration parameters currently return adapter error 3. A request is consumed
+once even on failure; use a new sequence to retry.
 
 The native graphics worker repeats continuously. The host monitors request
 sequences without stopping it. A pending operation causes a clean stop at the
@@ -205,6 +206,46 @@ Use `probe-network.cjs` to run a random-nonce echo server on the PC and verify
 both directions. Native TCP, DNS and TLS symbols exist but have no SDK adapters
 or completed handshake tests in this release. This API does not silently proxy
 traffic through the PC.
+
+## Persistent key-value storage (operation 5)
+
+Declare the `storage` capability. Storage is owned by the app's manifest `id`,
+so separate app IDs cannot read or overwrite each other's entries. It survives
+app and launcher restarts on the same host; removing an app package does not
+automatically erase its saved values. The host stores data under
+`~/.ozlauncher/storage` by default (override with `OZLAUNCHER_STORAGE_DIR`).
+
+Arguments A/B/C are action, key byte length, and value byte length: 1 saves,
+2 loads, 3 deletes, and 4 checks existence. Payload bytes start at offset 32
+and contain the key followed by the value for save, or only the key for other
+actions. Keys are 1–64 ASCII bytes matching
+`[A-Za-z0-9][A-Za-z0-9._-]*`; values are arbitrary bytes up to 900 bytes.
+Storage is limited to 256 keys and a 64 KiB serialized file per app. A successful
+load returns the value bytes; loading a missing key returns status 5. Delete and
+exists return one byte (`1` or `0`). Invalid actions, lengths, keys, or IDs
+return status 2; filesystem and quota errors return status 6.
+
+The shader helpers write bytes into the request payload before submitting it.
+Call them while the mailbox is idle, write the key at payload byte 0, and for a
+save write the value immediately after the key:
+
+```glsl
+if (!hbBusy()) {
+    hbStorageWriteByte(0u, 115u);
+    hbStorageWriteByte(1u, 99u);
+    hbStorageWriteByte(2u, 111u);
+    hbStorageWriteByte(3u, 114u);
+    hbStorageWriteByte(4u, 101u);
+    hbStorageWriteByte(5u, 42u);
+    hbStorageSave(5u, 1u);
+}
+```
+
+`hbStorageSucceeded()` and `hbStorageMissing()` inspect the completed result.
+For a successful load, `hbStorageValueBytes()` and `hbStorageValueByte(i)`
+expose the returned bytes. The write helper accepts a byte index and value in
+the range 0–255. A mailbox request is asynchronous: do not read its result until
+`hbBusy()` becomes false.
 
 ## Other services
 

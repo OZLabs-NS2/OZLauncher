@@ -88,5 +88,17 @@ bool hbScanNfc(){return hbRequest(2u,0u,0u,0u);}
 // Fill request payload before hbSendUdp. Call only when !hbBusy().
 void hbRequestByte(uint index,uint value){if(index>=1024u||hbBusy())return;uint o=HB_EXT+(2080u/4u)+index/4u,shift=(index%4u)*8u;c.atlas[o]=(c.atlas[o]&~(255u<<shift))|((value&255u)<<shift);}
 bool hbSendUdp(uint endpoint,uint bytes){return bytes>0u&&bytes<=1024u&&hbRequest(3u,endpoint,bytes,0u);}
+// Storage keys and values are byte sequences; write key bytes first, then value bytes.
+bool hbStorageWriteByte(uint index,uint value){if(index>=1024u||value>255u||hbBusy()||!hbAvailable())return false;hbRequestByte(index,value);return true;}
+bool hbStorageSave(uint keyBytes,uint valueBytes){return keyBytes>0u&&keyBytes<=64u&&valueBytes<=900u&&keyBytes+valueBytes<=1024u&&hbRequest(5u,1u,keyBytes,valueBytes);}
+bool hbStorageLoad(uint keyBytes){return keyBytes>0u&&keyBytes<=64u&&hbRequest(5u,2u,keyBytes,0u);}
+bool hbStorageDelete(uint keyBytes){return keyBytes>0u&&keyBytes<=64u&&hbRequest(5u,3u,keyBytes,0u);}
+bool hbStorageExists(uint keyBytes){return keyBytes>0u&&keyBytes<=64u&&hbRequest(5u,4u,keyBytes,0u);}
+bool hbStorageSucceeded(){return !hbBusy()&&hbResult()==0u;}
+bool hbStorageMissing(){return !hbBusy()&&hbResult()==5u;}
+uint hbStorageValueBytes(){return hbStorageSucceeded()?hbResponseBytes():0u;}
+uint hbStorageValueByte(uint index){return hbStorageSucceeded()?hbResponseByte(index):0u;}
+bool hbStorageExistsResult(){return hbStorageSucceeded()&&hbResponseBytes()==1u&&hbResponseByte(0u)!=0u;}
+bool hbStorageDeleteResult(){return hbStorageSucceeded()&&hbResponseBytes()==1u&&hbResponseByte(0u)!=0u;}
 #endif
 #endif

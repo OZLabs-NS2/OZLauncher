@@ -31,7 +31,7 @@ SmileBASIC imports and SDK definitions; it does not call arbitrary discoveries.
 | DNS / TLS | Inventory only | TLS symbols and `ssl` service present; no DNS/handshake adapter or test |
 | Local wireless / Bluetooth | Inventory only | `ldn`, `bluetooth`, `btm` exports; no session/pairing APIs exposed |
 | HID accessory bus | Discovery only | `hidbus` open returned raw Result `0x1015`; do not infer Ring-Con/accessory support |
-| Storage | Title-owned files through FTP; app assets on host | `save:/` and `tmp:/` read/write/commit verified; `rom:/` read-only; SD permission denied |
+| Storage | Per-app persistent key-value API; title-owned files through FTP; app assets on host | SDK values survive app/launcher restarts and are isolated by manifest ID; FTP `save:/` and `tmp:/` read/write/commit verified, `rom:/` read-only, SD permission denied |
 | Time / threads / memory | Internal qualified native worker support | Existing timer, pthread and owned-buffer machinery; not a public CPU app runtime |
 | System applets, accounts, web, album | Inventory only | Linked functions/imports do not establish usable app APIs |
 | JIT / runtime modules | Inventory only | Export presence does not establish executable allocation or native app loading |

@@ -114,6 +114,7 @@ request means the API accepted it; it does not prove physical actuation.
 | `host/layout.cjs` | Telemetry and mailbox constants; motion decoder |
 | `host/hardware.cjs` | Device discovery, native frame calls, motion ownership and pulses |
 | `host/runtime.cjs` | App capability validation and serialized mailbox dispatch |
+| `host/storage.cjs` | Per-app persistent key-value storage with atomic writes and quotas |
 | `host/joy-mouse.cjs` | Direct Jcms service lifecycle and optical sample decoder |
 | `host/haptics.cjs` | Native-timed amplitude/frequency envelopes and stop cleanup |
 | `native/finite.cjs` | Bounded native jobs with console-side completion |
