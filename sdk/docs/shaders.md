@@ -65,8 +65,10 @@ responses also enqueue a network-message event; NFC tag data enqueues a tag
 event only when the scan actually found one. For UDP and NFC, the specific
 notification is queued before the generic completion event so it is preserved
 if only one queue slot remains. Neither event duplicates the service response
-payload: use `hbResult()` and `hbResponseByte()` to inspect it. Existing
-capability checks still apply; event polling does not grant service access.
+payload: use `hbResult()` and `hbResponseByte()` to inspect it before starting
+another host operation, because the single mailbox holds only the latest
+response. Existing capability checks still apply; event polling does not grant
+service access.
 The service failure event includes nonzero statuses such as a missing storage
 key. No tag-removal or UDP peer-state events are produced.
 

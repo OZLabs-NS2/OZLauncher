@@ -5,7 +5,7 @@ const {tool}=require('../../scripts/toolchain.cjs');
 
 const ROOT=path.resolve(__dirname,'../..'),BUFFER_BYTES=8*1024*1024;
 const EXT=0x7f0000,EVENT_OFFSET=5152,MAGIC=0x48424556,VERSION=1;
-const EVENT={pressed:1,released:2,completed:3,failed:4,network:5,nfc:6};
+const EVENT={pressed:1,released:2,completed:3,failed:4,network:5,nfc:6,capacity:64};
 const fixture=async()=>{
  const directory=await fs.mkdtemp(path.join(os.tmpdir(),'hb-event-test-'));
  const shader=path.join(directory,'event-queue.spv');
@@ -56,7 +56,8 @@ test('GPU event queue preserves transitions, FIFO order, bounds, and service res
  assert.equal(event.dropped,0);assert.equal(event.available,0);assert.equal(event.consumed,1);
 
  const overflowFrames=Array.from({length:EVENT.capacity+1},(_,index)=>frame(index%2===0?1:0,1));
- output=await f.run(fresh(),[...overflowFrames,frame(1)]);
+ const beforeOverflowPoll=await f.run(fresh(),overflowFrames);
+ output=await f.run(beforeOverflowPoll,[frame(1)]);
  event=result(output);
  assert.equal(event.type,EVENT.pressed);assert.equal(event.data,1);assert.equal(event.sequence,1);
  assert.equal(event.dropped,1);assert.equal(event.overflowed,1);assert.equal(event.available,1);

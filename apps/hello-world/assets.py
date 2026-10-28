@@ -3,7 +3,7 @@ from PIL import Image, ImageDraw, ImageFont
 root=Path(__file__).resolve().parent
 font='/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
 atlas=Image.new('L',(1024,2048));draw=ImageDraw.Draw(atlas);header=[];y=2
-for name,label,size in [('HELLO','Hello, world!',96),('MESSAGE','Your first homebrew app is running.',32),('RETURN','B or Minus to return to HBLauncher',26)]:
+for name,label,size in [('HELLO','Hello, world!',96),('MESSAGE','Your first homebrew app is running.',32),('RETURN','B or Minus to return to HBLauncher',26),('BUTTON','Press A to start',28),('STARTED','Started!',28),('BACK','Return',28)]:
  face=ImageFont.truetype(font,size);box=draw.textbbox((0,0),label,font=face);w,h=box[2]-box[0],box[3]-box[1]
  draw.text((2-box[0],y-box[1]),label,font=face,fill=255)
  header.append(f'const ivec4 TEXT_{name} = ivec4(2, {y}, {w}, {h});');y+=h+8

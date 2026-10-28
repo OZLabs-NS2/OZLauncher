@@ -18,4 +18,5 @@ void main(){
  c.piece.y=int(hbEventDropped());
  c.piece.z=int(hbEventErrors());
  c.bag[0]=hbEventOverflowed()?1u:0u;
+ c.reserved.x=c.raw[0].w;c.reserved.y=c.state.y;
 }

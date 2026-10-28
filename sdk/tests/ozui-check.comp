@@ -1,0 +1,37 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+layout(local_size_x=1) in;
+#include "../include/state.glsl"
+#include "../include/hb.glsl"
+#define OZUI_INPUT
+#include "../include/ozui.glsl"
+
+void main() {
+    OzuiColumn column;
+    ozuiColumnBegin(column,vec2(10.0,20.0),100.0,5.0,7.0);
+    vec4 first=ozuiColumnNext(column,30.0);
+    vec4 second=ozuiColumnNext(column,20.0);
+    c.flow=vec4(first.xy,second.xy);
+
+    OzuiContext ui;
+    ozuiBegin(ui,0u,0u,0u,vec2(20.0,30.0),1u);
+    bool clicked=ozuiButton(ui,7u,first);
+    bool overlap=ozuiButton(ui,8u,first);
+    bool duplicate=ozuiButton(ui,7u,first);
+    uint focus,pointerDown;
+    ozuiEnd(ui,focus,pointerDown);
+
+    OzuiContext navigation;
+    ozuiBegin(navigation,7u,0u,HB_DOWN,vec2(-1.0),0u);
+    ozuiButton(navigation,7u,first);
+    ozuiButton(navigation,9u,second);
+    uint navigated,navigationPointer;
+    ozuiEnd(navigation,navigated,navigationPointer);
+
+    OzuiContext limited;
+    ozuiBegin(limited,0u,0u,0u,vec2(-1.0),0u);
+    for(uint i=1u;i<=33u;i++)ozuiButton(limited,i,first);
+    ozuiButton(limited,0u,first);
+
+    c.game= uvec4(navigated,pointerDown,uint(clicked)|(uint(overlap)<<1u)|(uint(duplicate)<<2u),ui.errors|(limited.errors<<8u));
+}

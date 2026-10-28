@@ -9,13 +9,23 @@ Hardware probes live under `tools/`; the launcher has no diagnostics menu.
 This SDK targets the repository's qualified **SmileBASIC 4.4.9 / Switch 2
 23.0.1** configuration. Applications contain GLSL/SPIR-V, assets and a manifest;
 the computer runs the native service adapter over the existing wireless bridge.
-The SDK does not provide a C/C++ CPU application loader. SDL2/SDL3 therefore
-cannot be dropped into this environment: that would also require a CPU runtime,
-loader, event integration, threads, audio and graphics backends. The smaller
-shader API here matches the execution environment that has actually been tested.
+The SDK also includes a minimal host-side C/C++ project workflow that compiles real
+source files into an OZ package. This is a conscious host-runtime bridge, not a
+full desktop SDL2/SDL3 port: the console still executes the validated shader app
+model that has been tested in this repository. The smaller shader API matches the
+execution environment that has actually been tested, while the new C/C++ path
+provides a straightforward package builder and starter templates for CPU-side code.
+
+The host-side C/C++ support is intentionally narrow and honest: it exposes a
+small public runtime and immediate-mode UI facade (`<oz/oz.h>`, `<oz/ui.h>`,
+`<oz/oz.hpp>`, `<oz/ui.hpp>`) for build-time SDK integration and host-side
+validation. The console loader continues to execute shader-based app content, and
+any GPU UI work must still flow through the validated OZUI shader path described
+in the GPU documentation.
 
 - [Getting started](#getting-started)
 - [Shader API](docs/shaders.md)
+- [OZUI shader UI](docs/ozui.md)
 - [Host API and service protocol](docs/services.md)
 - [Capability matrix and discovery](docs/capabilities.md)
 - [Native ABI, qualification and investigation](docs/native.md)
@@ -27,18 +37,21 @@ Install the tools listed in the root README, then from the repository root:
 
 ```sh
 node sdk/create-app.cjs my-app "My App"
+node sdk/create-app.cjs cpu-demo "CPU Demo" --lang c
+node sdk/create-app.cjs cpp-demo "C++ Demo" --lang cpp
 node apps/my-app/build.cjs
 ```
 
-The generator refuses to overwrite an existing folder. It copies Hello World's
-source, icon generator and assets, sets a unique manifest ID and adds an empty
-SDK capability declaration. Edit `assets.py` for the greeting and icon,
+The generator refuses to overwrite an existing folder. The default GPU flow copies
+Hello World's source, icon generator and assets, sets a unique manifest ID and adds
+an empty SDK capability declaration. Edit `assets.py` for the greeting and icon,
 `shaders/app.comp` for logic, and `shaders/app.frag` for drawing. Rebuild, return
-to the launcher, tap Refresh and select your app.
+to the launcher, tap Refresh and select your app. The C/C++ paths generate an
+`ozproject.json` and compile real source files into a `.oz` package.
 
 The builder copies `sdk/include/state.glsl` as `shaders/abi.glsl`, plus
-`hb.glsl` and `draw.glsl`. These copies are generated: edit the SDK originals
-when changing shared code. It compiles and validates Vulkan 1.0 SPIR-V. Commit
+`hb.glsl`, `draw.glsl`, and `ozui.glsl`. These copies are generated: edit the SDK
+originals when changing shared code. It compiles and validates Vulkan 1.0 SPIR-V. Commit
 the generated shaders and assets with an app so users can run it without a
 compiler. Keep `build.cjs` in the app to regenerate them.
 
@@ -110,6 +123,7 @@ request means the API accepted it; it does not prove physical actuation.
 | `include/state.glsl` | Stable 1024-byte application ABI and binding-zero storage |
 | `include/hb.glsl` | Input helpers, motion, keyboard, mouse and service requests |
 | `include/draw.glsl` | Analytic 2D drawing and text-atlas sampling |
+| `include/ozui.glsl` | Immediate-mode panel, button, layout and atlas-text helpers |
 | `build.cjs` | Header installation, shader compilation and SPIR-V validation |
 | `create-app.cjs` | Non-overwriting app generator |
 | `host/layout.cjs` | Telemetry and mailbox constants; motion decoder |
@@ -117,6 +131,7 @@ request means the API accepted it; it does not prove physical actuation.
 | `host/runtime.cjs` | App capability validation and serialized mailbox dispatch |
 | `host/storage.cjs` | Per-app persistent key-value storage with atomic writes and quotas |
 | `tests/event-system.test.cjs` | GPU-executed event queue and mailbox notification tests |
+| `docs/ozui.md` | OZUI API, lifecycle, layout, rendering and current limits |
 | `host/joy-mouse.cjs` | Direct Jcms service lifecycle and optical sample decoder |
 | `host/haptics.cjs` | Native-timed amplitude/frequency envelopes and stop cleanup |
 | `native/finite.cjs` | Bounded native jobs with console-side completion |
