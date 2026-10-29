@@ -1,8 +1,21 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os');
 const {scan,readApp,raster,SLOT_BYTES,MAX_APPS}=require('./app-catalog.cjs');
-async function fixture(){const root=await fs.mkdtemp(path.join(os.tmpdir(),'hb-catalog-test-'));await fs.cp(path.resolve(__dirname,'../apps/hello-world'),path.join(root,'hello-world'),{recursive:true});return root;}
+async function fixture(){const root=await fs.mkdtemp(path.join(os.tmpdir(),'hb-catalog-test-'));await fs.cp(path.resolve(__dirname,'../app-examples/hello-world'),path.join(root,'hello-world'),{recursive:true});return root;}
 async function edit(root,fn){const file=path.join(root,'hello-world/app.json'),m=JSON.parse(await fs.readFile(file));fn(m);await fs.writeFile(file,JSON.stringify(m));}
 test('Discovers complete packages and real shader stages',async()=>{const c=await scan(await fixture());assert.equal(c.apps.length,1);assert.equal(c.apps[0].id,'hello-world');assert.equal(c.rejected.length,0);});
+test('Discovers and launches extracted .oz packages before source folders',async()=>{
+ const root=await fixture(),source=path.join(root,'hello-world'),manifest=JSON.parse(await fs.readFile(path.join(source,'app.json')));
+ const archive=await require('../sdk/build.cjs').preparePackage(source,{buildDir:path.join(source,'build')},manifest);
+ const installed=path.join(root,'installed');await fs.mkdir(installed);await fs.copyFile(archive,path.join(installed,'hello-world.oz'));
+ const catalog=await scan(installed);assert.equal(catalog.apps.length,1);assert.equal(catalog.apps[0].id,'hello-world');
+ assert.equal(catalog.apps[0].files.compute.bytes.readUInt32LE(),0x07230203);
+});
+test('A packaged app takes precedence over its matching development folder',async()=>{
+ const root=await fixture(),source=path.join(root,'hello-world'),manifest=JSON.parse(await fs.readFile(path.join(source,'app.json')));
+ const archive=await require('../sdk/build.cjs').preparePackage(source,{buildDir:path.join(source,'build')},manifest);
+ await fs.copyFile(archive,path.join(root,'hello-world.oz'));
+ const catalog=await scan(root);assert.equal(catalog.apps.length,1);assert.equal(catalog.rejected.length,0);
+});
 test('Adding/removing folders changes the catalog without a launcher edit',async()=>{const root=await fixture(),first=await scan(root);await fs.rename(path.join(root,'hello-world'),path.join(root,'.removed'));assert.equal((await scan(root)).apps.length,0);await fs.rename(path.join(root,'.removed'),path.join(root,'renamed'));assert.equal((await scan(root)).apps[0].fingerprint,first.apps[0].fingerprint);});
 test('Manifest edits invalidate the package fingerprint',async()=>{const root=await fixture(),first=await scan(root);await edit(root,m=>m.name='Ocean Tool');assert.notEqual((await scan(root)).apps[0].fingerprint,first.apps[0].fingerprint);});
 test('Rejects unsupported ABI without hiding other apps',async()=>{const root=await fixture();await fs.cp(path.join(root,'hello-world'),path.join(root,'bad'),{recursive:true});const file=path.join(root,'bad/app.json'),m=JSON.parse(await fs.readFile(file));m.abi=999;await fs.writeFile(file,JSON.stringify(m));const c=await scan(root);assert.equal(c.apps.length,1);assert.match(c.rejected[0].error,/ABI/);});

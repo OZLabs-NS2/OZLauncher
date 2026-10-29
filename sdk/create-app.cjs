@@ -12,37 +12,36 @@ function parseArgs(argv){
 }
 
 async function create(id,name=id,options={}){
- const language=String((options.language||'gpu')).toLowerCase();
+ const requestedLanguage=String((options.language||'gpu')).toLowerCase();
+ const language=['c','cl','opencl','clspv'].includes(requestedLanguage)?'opencl':requestedLanguage;
  if(!/^[a-z0-9][a-z0-9-]{0,47}$/.test(id)||typeof name!=='string'||!name.trim()||name.length>64)throw Error('Use a lowercase app-id and a display name of 1..64 characters');
- const root=path.resolve(__dirname,'../apps'),target=path.join(root,id);
+ if(['cpp','c++'].includes(language))throw Error('C++ cannot be transpiled to the launcher shader ABI; use GLSL or a supported OpenCL C kernel');
+ if(['rust','rust-gpu'].includes(language))throw Error('Rust-GPU projects require a separately configured rust-gpu Cargo target; see docs/oztranspile.md');
+ if(!['gpu','glsl','opencl'].includes(language))throw Error('Supported app templates are gpu and opencl');
+ const templateRoot=path.resolve(__dirname,'../app-examples'),root=path.resolve(options.root||templateRoot),target=path.join(root,id);
  await fs.mkdir(target,{recursive:false});
  if(language==='gpu'||language==='glsl'){ 
-   const source=path.join(root,'hello-world');
+   const source=path.join(templateRoot,'hello-world');
    for(const item of ['assets','shaders','assets.py','build.cjs','app.json'])await fs.cp(path.join(source,item),path.join(target,item),{recursive:true,errorOnExist:true,force:false});
    const manifest=JSON.parse(await fs.readFile(path.join(target,'app.json')));manifest.id=id;manifest.name=name;manifest.description='Built with HB SDK';manifest.sdk={version:1,capabilities:[]};
    await fs.writeFile(path.join(target,'app.json'),JSON.stringify(manifest,null,2)+'\n');
-   await fs.writeFile(path.join(target,'README.md'),`# ${name}\n\nBuild from the project root:\n\n\`\`\`sh\nnode apps/${id}/build.cjs\n\`\`\`\n\nEdit shaders/app.comp for logic, shaders/app.frag for rendering, and assets.py for text and icon artwork. See ../../sdk/README.md for the complete SDK guide.\n`);
+   await fs.writeFile(path.join(target,'build.cjs'),`const path=require('node:path');\nconst {buildApp}=require('../../sdk/build.cjs');\nbuildApp(__dirname,{output:path.resolve(__dirname,'../../apps/${id}.oz')}).then(file=>console.log('Built '+file)).catch(error=>{console.error(error);process.exitCode=1;});\n`);
+   await fs.writeFile(path.join(target,'README.md'),`# ${name}\n\nBuild from the repository root:\n\n\`\`\`sh\nnode app-examples/${id}/build.cjs\n\`\`\`\n\nThis writes \`apps/${id}.oz\`, the installable package. Edit shaders/app.comp for logic, shaders/app.frag for rendering, and assets.py for text and icon artwork. See [the SDK guide](../../sdk/README.md) for the complete SDK documentation.\n`);
    return target;
  }
- const sourceDir=path.join(target); await fs.mkdir(path.join(sourceDir,'src'),{recursive:true});
- await fs.mkdir(path.join(sourceDir,'assets'),{recursive:true});
- await fs.mkdir(path.join(sourceDir,'include','oz'),{recursive:true});
- const manifest={format:'oz.project',version:1,id,name,version:'0.1.0',description:`Built with OZLauncher ${language.toUpperCase()} toolchain`,language,entry:language==='cpp'||language==='c++'?'src/main.cpp':'src/main.c',binary:id,assets:['assets'],capabilities:[]};
- await fs.writeFile(path.join(sourceDir,'ozproject.json'),JSON.stringify(manifest,null,2)+'\n');
- await fs.writeFile(path.join(sourceDir,'build.cjs'),`const {buildProject}=require('../../sdk/build.cjs');\nasync function main(){ await buildProject(__dirname); }\nmain().catch(error=>{console.error(error);process.exitCode=1;});\n`);
- await fs.writeFile(path.join(sourceDir,'README.md'),`# ${name}\n\nCreate a ${language.toUpperCase()} OZ app project and build it with:\n\n\`\`\`sh\nnode apps/${id}/build.cjs\n\`\`\`\n\nThe project compiles to a .oz package using the SDK toolchain. Use #include <oz/oz.h> and #include <oz/ui.h> for the supported host-side C/C++ API.\n`);
- if(language==='cpp'||language==='c++'){
-  await fs.writeFile(path.join(sourceDir,'src','main.cpp'),`#include <oz/oz.h>\n#include <oz/ui.h>\n#include <iostream>\n\nint main(){\n    oz_init();\n    ozui_context ui = {0U, 0, 0, 0, 0, 0, 0, 0, 0, 0};\n    while (oz_running()) {\n        oz_begin_frame();\n        ozui_begin(&ui);\n        if (ozui_button(&ui, "Hello from ${name}!", 40.0f, 30.0f, 220.0f, 52.0f)) {\n            oz_log("button pressed");\n        }\n        ozui_end(&ui);\n        oz_end_frame();\n    }\n    oz_shutdown();\n    return 0;\n}\n`);
- } else {
-  await fs.writeFile(path.join(sourceDir,'src','main.c'),`#include <oz/oz.h>\n#include <oz/ui.h>\n#include <stdio.h>\n\nint main(void){\n    oz_init();\n    ozui_context ui = {0U, 0, 0, 0, 0, 0, 0, 0, 0, 0};\n    while (oz_running()) {\n        oz_begin_frame();\n        ozui_begin(&ui);\n        if (ozui_button(&ui, "Hello from ${name}!", 40.0f, 30.0f, 220.0f, 52.0f)) {\n            oz_log("button pressed");\n        }\n        ozui_end(&ui);\n        oz_end_frame();\n    }\n    oz_shutdown();\n    return 0;\n}\n`);
+ if(language==='opencl'){
+  const source=path.join(templateRoot,'hello-world');
+  for(const item of ['assets','shaders','assets.py','build.cjs','app.json'])await fs.cp(path.join(source,item),path.join(target,item),{recursive:true,errorOnExist:true,force:false});
+  const manifest=JSON.parse(await fs.readFile(path.join(target,'app.json')));manifest.id=id;manifest.name=name;manifest.description='Built with OZTranspile';manifest.sdk={version:1,capabilities:[]};
+  await fs.writeFile(path.join(target,'app.json'),JSON.stringify(manifest,null,2)+'\n');
+  await fs.mkdir(path.join(target,'src'),{recursive:true});
+  await fs.writeFile(path.join(target,'src','main.cl'),'__kernel __attribute__((reqd_work_group_size(1, 1, 1)))\nvoid main(__global float *controls) {\n    controls[16] += 1.0f / 60.0f;\n}\n');
+  await fs.writeFile(path.join(target,'ozproject.json'),JSON.stringify({language:'opencl',entry:'src/main.cl'},null,2)+'\n');
+  await fs.writeFile(path.join(target,'build.cjs'),`const path=require('node:path');\nconst {buildProject}=require('../../sdk/build.cjs');\nbuildProject(__dirname,{output:path.resolve(__dirname,'../../apps/${id}.oz')}).then(file=>console.log('Built '+file)).catch(error=>{console.error(error);process.exitCode=1;});\n`);
+  await fs.writeFile(path.join(target,'README.md'),`# ${name}\n\nThis app starts from the OZ ABI-1 GPU template and adds a single-invocation OpenCL C compute kernel. Install clspv and SPIRV-Tools, then run from the repository root:\n\n\`\`\`sh\nnode sdk/oztranspile.cjs check app-examples/${id}\nnode sdk/oztranspile.cjs build app-examples/${id} --output apps/${id}.oz\n\`\`\`\n\nThe generated \`.oz\` package is the installable app. The kernel is not an ordinary CPU C program. See [OZTranspile](../../docs/oztranspile.md) for supported inputs and limits.\n`);
+  return target;
  }
- await fs.copyFile(path.join(__dirname,'include','oz','oz.h'),path.join(sourceDir,'include','oz.h'));
- await fs.copyFile(path.join(__dirname,'include','oz','oz.hpp'),path.join(sourceDir,'include','oz.hpp'));
- await fs.copyFile(path.join(__dirname,'include','oz','ui.h'),path.join(sourceDir,'include','oz','ui.h'));
- await fs.copyFile(path.join(__dirname,'include','oz','ui.hpp'),path.join(sourceDir,'include','oz','ui.hpp'));
- await fs.copyFile(path.join(__dirname,'include','oz','oz.h'),path.join(sourceDir,'include','oz','oz.h'));
- await fs.copyFile(path.join(__dirname,'include','oz','oz.hpp'),path.join(sourceDir,'include','oz','oz.hpp'));
- return target;
+ throw Error('Unsupported app template language: '+language);
 }
 module.exports={create,parseArgs};
-if(require.main===module){const {id,name,language}=parseArgs(process.argv.slice(2));create(id,name,{language}).then(p=>console.log('Created '+p+'; run its build.cjs to produce a .oz package.')).catch(e=>{console.error(e.message);process.exitCode=1;});}
+if(require.main===module){const {id,name,language}=parseArgs(process.argv.slice(2));create(id,name,{language}).then(p=>console.log(`Created ${p}; ${['c','cl','opencl','clspv'].includes(language)?'run oztranspile to build the .oz package.':'run its build.cjs to produce the .oz package.'}`)).catch(e=>{console.error(e.message);process.exitCode=1;});}

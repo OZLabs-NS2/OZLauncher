@@ -1,9 +1,9 @@
-const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto');
+const fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
 const {execFile}=require('node:child_process');
 const {promisify}=require('node:util');
 const {inflateSync}=require('node:zlib');
-const run=promisify(execFile);
-const ROOT=path.resolve(__dirname,'../apps'),MAX_APPS=32,SLOT_BYTES=131072,ATLAS_BYTES=1024*2048;
+const run=promisify(execFile),packageCache=new Map();
+const ROOT=path.resolve(__dirname,'../apps'),MAX_APPS=32,SLOT_BYTES=131072,ATLAS_BYTES=1024*2048,MAX_OZ_BYTES=64*1024*1024;
 const check=(v,m)=>{if(!v)throw Error(m);};
 async function asset(root,name,max){
  check(typeof name==='string'&&name.length>0&&!path.isAbsolute(name)&&!name.split(/[\\/]/).includes('..'),'Asset path must stay inside its app');
@@ -55,12 +55,28 @@ async function readApp(directory,{validate=true}={}){
  }
  return {id:m.id,name:m.name.trim(),version:m.version,description:m.description,root,manifest:m,files,effects,effectData,fingerprint:hash.digest('hex')};
 }
+async function readPackage(file){
+ const stat=await fs.lstat(file);check(stat.isFile()&&!stat.isSymbolicLink()&&stat.size<=MAX_OZ_BYTES,'Invalid or oversized .oz archive');
+ const archive=await fs.readFile(file),key=path.resolve(file)+':'+crypto.createHash('sha256').update(archive).digest('hex');
+ if(packageCache.has(key))return packageCache.get(key);
+ const temporary=await fs.mkdtemp(path.join(os.tmpdir(),'oz-app-')),root=path.join(temporary,'app');
+ const python=process.env.PYTHON||(process.platform==='win32'?'python':'python3');
+ await run(python,[path.join(__dirname,'../sdk/package.py'),'extract',file,root],{timeout:15000,maxBuffer:65536});
+ const app=await readApp(root);
+ packageCache.set(key,app);
+ return app;
+}
 async function scan(root=ROOT){
  root=path.resolve(root);let entries;try{entries=await fs.readdir(root,{withFileTypes:true});}catch(error){if(error.code==='ENOENT')return {root,apps:[],rejected:[]};throw error;}
- const apps=[],rejected=[],ids=new Set();
+ const apps=[],rejected=[],ids=new Set(),packageIds=new Set();
+ const packages=entries.filter(entry=>entry.isFile()&&entry.name.endsWith('.oz')).sort((a,b)=>a.name.localeCompare(b.name));
+ for(const entry of packages){
+  try{check(apps.length<MAX_APPS,'Catalog limit is 32 apps');const app=await readPackage(path.join(root,entry.name));check(!ids.has(app.id),'Duplicate app id');ids.add(app.id);packageIds.add(app.id);apps.push(app);}
+  catch(error){rejected.push({folder:entry.name,error:error.message});}
+ }
  for(const entry of entries.sort((a,b)=>a.name.localeCompare(b.name))){
   if(!entry.isDirectory()||entry.name.startsWith('.'))continue;
-  try{check(apps.length<MAX_APPS,'Catalog limit is 32 apps');const app=await readApp(path.join(root,entry.name));check(!ids.has(app.id),'Duplicate app id');ids.add(app.id);apps.push(app);}
+  try{check(apps.length<MAX_APPS,'Catalog limit is 32 apps');const app=await readApp(path.join(root,entry.name));if(packageIds.has(app.id))continue;check(!ids.has(app.id),'Duplicate app id');ids.add(app.id);apps.push(app);}
   catch(error){rejected.push({folder:entry.name,error:error.message});}
  }
  return {root,apps,rejected};
@@ -77,4 +93,4 @@ async function raster(catalog,directory,label='catalog'){
  await run('python3',[path.join(__dirname,'catalog-assets.py'),input,output],{timeout:15000,maxBuffer:65536});
  const bytes=await fs.readFile(output);check(bytes.length===MAX_APPS*SLOT_BYTES,'Invalid catalog raster');return bytes;
 }
-module.exports={ROOT,MAX_APPS,SLOT_BYTES,ATLAS_BYTES,asset,readApp,scan,summary,raster};
+module.exports={ROOT,MAX_APPS,SLOT_BYTES,ATLAS_BYTES,asset,readApp,readPackage,scan,summary,raster};

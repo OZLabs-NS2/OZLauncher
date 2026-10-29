@@ -8,7 +8,7 @@ for stage in vert frag comp; do
  "${GLSLANG:-./tools/glslangValidator}" -V -Os -g0 --target-env vulkan1.0 "homebrew-launcher/shaders/launcher.$stage" -o "homebrew-launcher/shaders/launcher.$stage.spv"
  "${SPIRV_VAL:-./tools/spirv-val}" --target-env vulkan1.0 "homebrew-launcher/shaders/launcher.$stage.spv"
 done
-"$NODE" apps/hello-world/build.cjs
+"$NODE" sdk/build-examples.cjs
 if [[ ${1:-} == --check ]]; then
  bash scripts/build-checks.sh
  "$NODE" --test homebrew-launcher/*.test.cjs sdk/tests/*.test.cjs

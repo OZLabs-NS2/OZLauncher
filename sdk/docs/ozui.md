@@ -5,9 +5,10 @@ pipeline. The app still runs one compute shader invocation per frame followed by
 the normal fullscreen vertex/fragment draw. OZUI does not add Vulkan
 submissions, alter binding 0, or change the host mailbox.
 
-The working vertical slice is the [Hello World app](../../apps/hello-world):
-it renders a rounded panel, atlas-backed text, two buttons, controller focus,
-and touch activation. It builds and runs through the normal app pipeline.
+The working vertical slice is the
+[Hello World app](../../app-examples/hello-world): it renders a rounded panel,
+atlas-backed text, two buttons, controller focus, and touch activation. It
+builds and runs through the normal app pipeline.
 
 ## Integration and limits
 
@@ -107,7 +108,7 @@ state so the application can draw input feedback.
 The text API samples an `ivec4` glyph rectangle from the grayscale atlas at
 `c.atlas`. It does not rasterize arbitrary strings at runtime. Generate glyph
 rectangles and the atlas at build time using the existing app asset workflow;
-`apps/hello-world/assets.py` is the current example. Its developer setup uses
+`app-examples/hello-world/assets.py` is the current example. Its developer setup uses
 Pillow and the host's DejaVu Sans font package. The app packages the atlas, not
 a font engine.
 
@@ -118,8 +119,8 @@ There is no persistent allocation in the renderer.
 
 ## Validation
 
-`node apps/hello-world/build.cjs` compiles and validates all three Vulkan 1.0
-shaders. `node apps/hello-world/check.cjs` executes the compute SPIR-V on the
+`node app-examples/hello-world/build.cjs` compiles and validates all three Vulkan 1.0
+shaders. `node app-examples/hello-world/check.cjs` executes the compute SPIR-V on the
 desktop Vulkan test path and renders the fragment SPIR-V offscreen. The checks
 cover layout coordinates, duplicate IDs, resource limits, controller
 navigation/activation, and visible panel, text, and button output. This is not

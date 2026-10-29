@@ -3,25 +3,25 @@
 Build GPU apps for HBLauncher running through SmileBASIC. The launcher is the
 SDK's integration example: normal navigation uses its input helpers, and the
 cursor uses native Joy-Con 2 optical samples. Hello World is the minimal app;
-[Event System](../apps/event-system/README.md) demonstrates the event queue.
+[Event System](../app-examples/event-system/README.md) demonstrates the event queue.
 Hardware probes live under `tools/`; the launcher has no diagnostics menu.
 
 This SDK targets the repository's qualified **SmileBASIC 4.4.9 / Switch 2
-23.0.1** configuration. Applications contain GLSL/SPIR-V, assets and a manifest;
-the computer runs the native service adapter over the existing wireless bridge.
-The SDK also includes a minimal host-side C/C++ project workflow that compiles real
-source files into an OZ package. This is a conscious host-runtime bridge, not a
-full desktop SDL2/SDL3 port: the console still executes the validated shader app
-model that has been tested in this repository. The smaller shader API matches the
-execution environment that has actually been tested, while the new C/C++ path
-provides a straightforward package builder and starter templates for CPU-side code.
+23.0.1** configuration. Launcher apps contain GLSL/SPIR-V, assets and an ABI-1 manifest;
+The installable app is a `.oz` ZIP package, not a CPU-native executable.
+OZTranspile compiles OpenCL C via clspv or Rust-GPU shader crates via cargo-gpu
+into the existing compute-shader slot. It does not translate arbitrary C/C++
+desktop programs. OZ Studio runs a limited ABI-1 compute-only Vulkan simulation
+on Linux; it does not reproduce the full console renderer or host services.
 
-The host-side C/C++ support is intentionally narrow and honest: it exposes a
-small public runtime and immediate-mode UI facade (`<oz/oz.h>`, `<oz/ui.h>`,
-`<oz/oz.hpp>`, `<oz/ui.hpp>`) for build-time SDK integration and host-side
-validation. The console loader continues to execute shader-based app content, and
-any GPU UI work must still flow through the validated OZUI shader path described
-in the GPU documentation.
+See the [OZTranspile guide](../docs/oztranspile.md), [OZ Studio guide](../docs/ozstudio.md),
+and [compatibility matrix](../docs/transpilation-compatibility.md) for precise
+tool requirements and limitations.
+
+Prebuilt `.oz` examples are included under `apps/`. Run
+`node sdk/build-examples.cjs` to build source-backed apps and validate the
+complete package set. See the [example catalog](../apps/README.md) for controls
+and package details.
 
 - [Getting started](#getting-started)
 - [Shader API](docs/shaders.md)
@@ -33,27 +33,32 @@ in the GPU documentation.
 
 ## Getting started
 
-Install the tools listed in the root README, then from the repository root:
+Install the prerequisites listed in the
+[OZTranspile guide](../docs/oztranspile.md), then from the repository root:
 
 ```sh
 node sdk/create-app.cjs my-app "My App"
-node sdk/create-app.cjs cpu-demo "CPU Demo" --lang c
-node sdk/create-app.cjs cpp-demo "C++ Demo" --lang cpp
-node apps/my-app/build.cjs
+node app-examples/my-app/build.cjs
 ```
 
 The generator refuses to overwrite an existing folder. The default GPU flow copies
 Hello World's source, icon generator and assets, sets a unique manifest ID and adds
 an empty SDK capability declaration. Edit `assets.py` for the greeting and icon,
 `shaders/app.comp` for logic, and `shaders/app.frag` for drawing. Rebuild, return
-to the launcher, tap Refresh and select your app. The C/C++ paths generate an
-`ozproject.json` and compile real source files into a `.oz` package.
+to the launcher, tap Refresh and select your app. The source project is created
+under `app-examples/`, and the build emits `apps/my-app.oz` for installation.
+Use OZTranspile for OpenCL C or Rust-GPU shader projects.
+
+To scaffold the supported OpenCL C shader path instead, use
+`node sdk/create-app.cjs my-kernel "My Kernel" --lang opencl`. The `--lang c`
+alias also creates OpenCL C, not a native CPU app. Rust-GPU projects must use a
+shader crate configured for the upstream cargo-gpu toolchain.
 
 The builder copies `sdk/include/state.glsl` as `shaders/abi.glsl`, plus
 `hb.glsl`, `draw.glsl`, and `ozui.glsl`. These copies are generated: edit the SDK
-originals when changing shared code. It compiles and validates Vulkan 1.0 SPIR-V. Commit
-the generated shaders and assets with an app so users can run it without a
-compiler. Keep `build.cjs` in the app to regenerate them.
+originals when changing shared code. It compiles and validates Vulkan 1.0 SPIR-V,
+then builds the installable `.oz` package. Keep shader sources and assets with
+an app to rebuild it.
 
 A complete compute shader with button handling:
 
@@ -149,7 +154,7 @@ request means the API accepted it; it does not prove physical actuation.
 
 ```sh
 bash homebrew-launcher/build-launcher.sh --check
-node apps/hello-world/check.cjs
+node app-examples/hello-world/check.cjs
 node sdk/tests/launcher.cjs
 ```
 

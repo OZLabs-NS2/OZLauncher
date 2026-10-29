@@ -7,7 +7,7 @@ check('Node.js 22+',Number(process.versions.node.split('.')[0])>=22,'Install Nod
 check('Python 3 + Pillow',runs('python3',['-c','from PIL import Image,ImageDraw,ImageFont']),'Install python3 and python3-pil');
 check('DejaVu Sans font',fs.existsSync('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),'Install fonts-dejavu-core');
 check('SPIR-V validator',runs(tool('SPIRV_VAL','spirv-val'),['--version']),'Install spirv-tools or set SPIRV_VAL');
-for(const file of ['homebrew-launcher/shaders/launcher.comp.spv','homebrew-launcher/shaders/launcher.frag.spv','apps/hello-world/app.json'])check(file,fs.existsSync(path.join(root,file)),'Use the complete release archive');
+for(const file of ['homebrew-launcher/shaders/launcher.comp.spv','homebrew-launcher/shaders/launcher.frag.spv','app-examples/hello-world/app.json'])check(file,fs.existsSync(path.join(root,file)),'Use the complete release archive');
 if(!process.argv.includes('--host-only')){let key='';try{key=fs.readFileSync(path.join(root,'smilebasic/pico-keyboard/secret'),'utf8').trim();}catch{}check('Local Pico pairing key',/^[a-f0-9]{32}$/i.test(key),'Run smilebasic/pico-keyboard/install.sh with your CIRCUITPY drive and PC IPv4 address');}
 if(process.argv.includes('--build'))check('GLSL compiler',runs(tool('GLSLANG','glslangValidator'),['--version']),'Install glslang-tools or set GLSLANG');
 if(failed)process.exitCode=1;else console.log('Host checks passed. Console firmware, SmileBASIC version, Pico wiring and network reachability must be checked on the devices.');

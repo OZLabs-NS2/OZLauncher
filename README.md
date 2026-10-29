@@ -86,6 +86,22 @@ Once available, this section will cover:
 4. Creating and installing homebrew applications.
 5. Building applications with the OZLabs HB SDK.
 
+## Developer Tools
+
+The SDK can package existing shader applications as `.oz`, transpile supported
+OpenCL C and Rust-GPU compute kernels into the current ABI-1 app format, and
+validate or extract packages. OZ Studio provides a Linux Vulkan compute-only
+simulation; it does not render apps or establish Switch 2 hardware compatibility.
+See the [OZTranspile guide](docs/oztranspile.md), [OZ Studio guide](docs/ozstudio.md),
+[compatibility matrix](docs/transpilation-compatibility.md), and
+[`.oz` package specification](docs/oz-package-format.md).
+
+The repository includes prebuilt `.oz` examples—Hello World, Event System,
+Snake, Paddle Party, and Minefield—in [apps/](apps/). Source for the first two
+examples lives in [app-examples/](app-examples/). Rebuild those examples and
+validate all packages with `node sdk/build-examples.cjs`; see
+[the example catalog](apps/README.md).
+
 ## Contributing
 
 Contributions, testing, documentation improvements, and constructive feedback are welcome as the project develops.

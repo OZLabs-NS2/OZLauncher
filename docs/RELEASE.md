@@ -13,7 +13,7 @@ Checks:
 node scripts/doctor.cjs --host-only --build
 bash homebrew-launcher/build-launcher.sh --check
 node sdk/tests/launcher.cjs
-node apps/hello-world/check.cjs
+node app-examples/hello-world/check.cjs
 git diff --check
 ```
 

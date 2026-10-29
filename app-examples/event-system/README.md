@@ -14,7 +14,7 @@ mailbox response retains its payload.
 Build from the project root:
 
 ```sh
-node apps/event-system/build.cjs
+node app-examples/event-system/build.cjs
 ```
 
 See [the shader API guide](../../sdk/docs/shaders.md#events) for event IDs,
