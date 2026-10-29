@@ -5,7 +5,7 @@ const {execFileSync}=require('node:child_process');
 const ROOT=path.resolve(__dirname,'..');
 const SOURCE_ROOT=path.join(ROOT,'app-examples');
 const SOURCE_APPS=['hello-world','event-system'];
-const PRELOADED_APPS=['event-system','hello-world','minesweeper','pong','snake'];
+const PRELOADED_APPS=['doom','event-system','hello-world','minesweeper','pong','snake'];
 
 async function main(){
  for(const id of SOURCE_APPS){

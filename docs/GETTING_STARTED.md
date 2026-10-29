@@ -10,9 +10,9 @@ supported SmileBASIC version. Other boards, operating systems and versions are
 not certified by this release.
 
 You do not need to compile the launcher to try the release. Its GPU shaders and
-prebuilt `.oz` example apps are included in `apps/`; the Hello World, Event
-System, Snake, Paddle Party, and Minefield packages are discovered from that
-catalog. The computer must stay running while you use it.
+prebuilt `.oz` example apps are included in `apps/`; the DOOM, Hello World,
+Event System, Snake, Paddle Party, and Minefield packages are discovered from
+that catalog. The computer must stay running while you use it.
 
 ## 1. Gather the hardware
 

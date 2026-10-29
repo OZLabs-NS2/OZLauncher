@@ -96,10 +96,11 @@ See the [OZTranspile guide](docs/oztranspile.md), [OZ Studio guide](docs/ozstudi
 [compatibility matrix](docs/transpilation-compatibility.md), and
 [`.oz` package specification](docs/oz-package-format.md).
 
-The repository includes prebuilt `.oz` examples—Hello World, Event System,
-Snake, Paddle Party, and Minefield—in [apps/](apps/). Source for the first two
-examples lives in [app-examples/](app-examples/). Rebuild those examples and
-validate all packages with `node sdk/build-examples.cjs`; see
+The repository includes prebuilt `.oz` examples—DOOM, Hello World, Event
+System, Snake, Paddle Party, and Minefield—in [apps/](apps/). Hello World and
+Event System sources live in [app-examples/](app-examples/); DOOM's corresponding
+source and notices are embedded in `doom.oz`. Rebuild the source-backed
+examples and validate all packages with `node sdk/build-examples.cjs`; see
 [the example catalog](apps/README.md).
 
 ## Contributing
